@@ -1,6 +1,6 @@
 apiVersion: v2
 name: 2fauth
-description: |
+description: >-
   A web app to manage your Two-Factor Authentication (2FA) accounts and generate
   their security codes. Self-hosted alternative to Google Authenticator & friends.
 type: application
@@ -11,10 +11,14 @@ version: 1.0.0
 # Version of 2FAuth shipped by default (used as the default image tag).
 appVersion: "8.0.2"
 
-home: https://docs.2fauth.app
+home: https://github.com/GuillaumeSaile/2fauth-helm-chart
 icon: https://raw.githubusercontent.com/Bubka/2FAuth/master/public/logo.svg
 sources:
+  # First entry becomes the OCI `org.opencontainers.image.source` annotation,
+  # which GHCR uses to link the package to this repository.
+  - https://github.com/GuillaumeSaile/2fauth-helm-chart
   - https://github.com/Bubka/2FAuth
+  - https://docs.2fauth.app
   - https://hub.docker.com/r/2fauth/2fauth
 
 keywords:

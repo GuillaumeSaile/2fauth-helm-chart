@@ -12,14 +12,21 @@ on port 8000, running as uid/gid 1000) into a proper Kubernetes deployment.
 
 ## TL;DR
 
+The chart is published as an OCI artifact on GitHub Container Registry:
+
 ```sh
-git clone <this repo> && cd <this repo>
-helm install my-2fauth ./charts/2fauth \
+helm install my-2fauth oci://ghcr.io/guillaumesaile/charts/2fauth \
+  --version 1.0.0 \
   --namespace 2fauth --create-namespace \
   --set config.app.url=https://2fa.example.com \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=2fa.example.com
 ```
+
+Available versions are listed on the repository's
+[Releases page](https://github.com/GuillaumeSaile/2fauth-helm-chart/releases).
+To install from a checkout instead, replace the `oci://…` reference with
+`./charts/2fauth` and drop `--version`.
 
 Then open the URL and register **straight away**: the first account created
 becomes the administrator, and registration is open to anyone who can reach the
@@ -341,7 +348,8 @@ Back up both. The volume without the key is useless.
 ### Upgrade
 
 ```sh
-helm upgrade my-2fauth ./charts/2fauth -n 2fauth --reuse-values
+helm upgrade my-2fauth oci://ghcr.io/guillaumesaile/charts/2fauth \
+  --version <new-version> -n 2fauth --reuse-values
 ```
 
 The entrypoint compares the image's commit against the `installed` marker and

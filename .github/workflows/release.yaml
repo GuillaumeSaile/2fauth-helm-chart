@@ -1,0 +1,111 @@
+name: Release
+
+# Publishes the chart to GitHub Container Registry as an OCI artifact:
+#   oci://ghcr.io/<owner>/charts/2fauth
+# A release happens whenever main contains a chart version that has no
+# `2fauth-<version>` tag yet. Bumping `version` in Chart.yaml is the release
+# trigger; pushes that don't bump it run CI and stop.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "charts/**"
+      - ".github/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yaml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the tag and GitHub release
+      packages: write # push to ghcr.io
+    env:
+      CHART_DIR: charts/2fauth
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # need existing tags
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+
+      - name: Read chart metadata
+        id: chart
+        run: |
+          set -euo pipefail
+          name=$(awk '/^name:/ {print $2}' "${CHART_DIR}/Chart.yaml")
+          version=$(awk '/^version:/ {print $2}' "${CHART_DIR}/Chart.yaml")
+          app_version=$(awk '/^appVersion:/ {gsub(/"/, "", $2); print $2}' "${CHART_DIR}/Chart.yaml")
+          tag="${name}-${version}"
+          # OCI references must be lowercase; GitHub owners may not be.
+          registry="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            released=true
+            echo "::notice::${tag} is already released; bump 'version' in Chart.yaml to publish a new one."
+          else
+            released=false
+          fi
+          {
+            echo "name=${name}"
+            echo "version=${version}"
+            echo "app_version=${app_version}"
+            echo "tag=${tag}"
+            echo "registry=${registry}"
+            echo "released=${released}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Package
+        if: steps.chart.outputs.released == 'false'
+        run: helm package "${CHART_DIR}" --destination dist
+
+      - name: Push to GHCR
+        if: steps.chart.outputs.released == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY: ${{ steps.chart.outputs.registry }}
+          PACKAGE: dist/${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz
+        run: |
+          set -euo pipefail
+          echo "${GITHUB_TOKEN}" | helm registry login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+          helm push "${PACKAGE}" "oci://${REGISTRY}"
+
+      - name: Create GitHub release
+        if: steps.chart.outputs.released == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NAME: ${{ steps.chart.outputs.name }}
+          VERSION: ${{ steps.chart.outputs.version }}
+          APP_VERSION: ${{ steps.chart.outputs.app_version }}
+          TAG: ${{ steps.chart.outputs.tag }}
+          REGISTRY: ${{ steps.chart.outputs.registry }}
+        run: |
+          set -euo pipefail
+          cat > notes.md <<EOF
+          Chart \`${NAME}\` **${VERSION}** — deploys 2FAuth **${APP_VERSION}**.
+
+          \`\`\`sh
+          helm install my-2fauth oci://${REGISTRY}/${NAME} --version ${VERSION} \\
+            --namespace 2fauth --create-namespace \\
+            --set config.app.url=https://2fa.example.com
+          \`\`\`
+
+          Before upgrading, back up the \`/2fauth\` volume and the \`APP_KEY\` Secret.
+          EOF
+          gh release create "${TAG}" "dist/${NAME}-${VERSION}.tgz" \
+            --target "${GITHUB_SHA}" \
+            --title "${NAME} ${VERSION}" \
+            --notes-file notes.md \
+            --generate-notes

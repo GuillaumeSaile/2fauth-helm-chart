@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+  # Also run as the gate in front of release.yaml on pushes to main.
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow_ref }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (Helm ${{ matrix.helm }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The chart supports both Helm majors; test the latest of each.
+        helm: [v3.22.0, v4.3.0]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ matrix.helm }}
+
+      - name: Lint, render and check guardrails
+        run: .github/scripts/lint.sh charts/2fauth
+
+  version-check:
+    name: Chart version not already released
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # need the base commit and the release tags
+
+      - name: Require a version bump when the packaged chart changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          chart=charts/2fauth
+          # README and ci/ changes don't alter what users install from the registry.
+          if git diff --quiet "${BASE_SHA}" HEAD -- "${chart}" \
+               ":(exclude)${chart}/README.md" ":(exclude)${chart}/ci"; then
+            echo "Packaged chart unchanged; no version bump needed."
+            exit 0
+          fi
+          name=$(awk '/^name:/ {print $2}' "${chart}/Chart.yaml")
+          version=$(awk '/^version:/ {print $2}' "${chart}/Chart.yaml")
+          tag="${name}-${version}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "::error file=${chart}/Chart.yaml::Chart changed but version ${version} is already released as ${tag}. Bump 'version' in Chart.yaml."
+            exit 1
+          fi
+          echo "ok: ${tag} is not released yet."
+
+  install:
+    name: Install (${{ matrix.scenario }}, Helm ${{ matrix.helm }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        helm: [v3.22.0, v4.3.0]
+        scenario: [default, features]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ matrix.helm }}
+
+      - name: Create kind cluster
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
+
+      - name: Install, test, upgrade, test
+        run: .github/scripts/install-test.sh "charts/2fauth/ci/${{ matrix.scenario }}-values.yaml" charts/2fauth

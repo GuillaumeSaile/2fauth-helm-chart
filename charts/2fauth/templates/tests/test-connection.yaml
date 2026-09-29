@@ -43,7 +43,8 @@ spec:
           # Service, which shows up as an immediate connection refused.
           attempt=1
           while [ "${attempt}" -le {{ .Values.tests.retries }} ]; do
-            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "${url}" || echo "000")
+            # On failure curl still prints "000" via -w; `|| true` keeps set -e happy.
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "${url}" || true)
             echo "attempt ${attempt}: HTTP ${code}"
             if [ "${code}" = "200" ]; then
               echo "OK"

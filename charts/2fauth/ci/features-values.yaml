@@ -1,0 +1,22 @@
+# CI scenario: exercise the optional resources and value paths.
+config:
+  app:
+    url: https://2fauth.ci.local
+  userPreferences:
+    defaults:
+      THEME: dark
+    locked:
+      THEME: true
+ingress:
+  enabled: true
+  hosts:
+    - host: 2fauth.ci.local
+      paths:
+        - path: /
+          pathType: Prefix
+scheduler:
+  enabled: true
+networkPolicy:
+  enabled: true
+persistence:
+  size: 256Mi

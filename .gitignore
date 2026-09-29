@@ -5,3 +5,4 @@
 # Packaged charts
 *.tgz
 .DS_Store
+*.swp

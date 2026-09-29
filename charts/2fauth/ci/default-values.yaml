@@ -1,0 +1,4 @@
+# CI scenario: out-of-the-box install (SQLite on a PVC, no ingress).
+# Files in this directory are excluded from the packaged chart (.helmignore).
+persistence:
+  size: 256Mi
