@@ -1,0 +1,117 @@
+{{- if .Values.scheduler.enabled }}
+{{- /*
+The upstream image runs only nginx and php-fpm under supervisord, so Laravel's
+task scheduler never fires. As of 2FAuth 8.x the schedule holds a single entry,
+`cache:prune-stale-tags`, which is a no-op unless the cache store supports tags
+(i.e. Redis) — hence this CronJob is opt-in.
+
+It deliberately overrides the image ENTRYPOINT: that script runs migrations and
+then execs supervisord, which is not what we want for a one-shot command. That
+also means the symlinks it normally creates (/srv/storage -> /2fauth/storage,
+/srv/database/database.sqlite -> /2fauth/database.sqlite) do not exist here, so
+the SQLite path is pointed straight at the volume when data is mounted.
+*/}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "2fauth.fullname" . }}-scheduler
+  namespace: {{ include "2fauth.namespace" . }}
+  labels:
+    {{- include "2fauth.schedulerLabels" . | nindent 4 }}
+  {{- with (include "2fauth.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  schedule: {{ .Values.scheduler.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.scheduler.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.scheduler.failedJobsHistoryLimit }}
+  startingDeadlineSeconds: {{ .Values.scheduler.startingDeadlineSeconds }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.scheduler.backoffLimit }}
+      template:
+        metadata:
+          labels:
+            {{- include "2fauth.schedulerSelectorLabels" . | nindent 12 }}
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          restartPolicy: OnFailure
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "2fauth.serviceAccountName" . }}
+          automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+          {{- with .Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: scheduler
+              image: {{ include "2fauth.image" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              workingDir: /srv
+              command:
+                {{- toYaml .Values.scheduler.command | nindent 16 }}
+              {{- with .Values.securityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              envFrom:
+                - configMapRef:
+                    name: {{ include "2fauth.configMapName" . }}
+                {{- with .Values.extraEnvFrom }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              env:
+                {{- include "2fauth.secretEnv" . | nindent 16 }}
+                {{- if and .Values.scheduler.mountData (eq .Values.database.type "sqlite") }}
+                - name: DB_DATABASE
+                  value: /2fauth/database.sqlite
+                {{- end }}
+                {{- with .Values.extraEnv }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              {{- with .Values.scheduler.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- if or .Values.scheduler.mountData .Values.extraVolumeMounts }}
+              volumeMounts:
+                {{- if .Values.scheduler.mountData }}
+                - name: data
+                  mountPath: /2fauth
+                {{- end }}
+                {{- with .Values.extraVolumeMounts }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              {{- end }}
+          {{- if or .Values.scheduler.mountData .Values.extraVolumes }}
+          volumes:
+            {{- if .Values.scheduler.mountData }}
+            - name: data
+              {{- if .Values.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ include "2fauth.pvcName" . }}
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+            {{- end }}
+            {{- with .Values.extraVolumes }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+{{- end }}

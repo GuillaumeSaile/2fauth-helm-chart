@@ -1,0 +1,526 @@
+# Default values for the 2fauth chart.
+# Reference for every 2FAuth setting: https://docs.2fauth.app/getting-started/config/env-vars/
+
+# -- Override the chart name used for resource names.
+nameOverride: ""
+# -- Fully override the generated resource name prefix.
+fullnameOverride: ""
+# -- Override the namespace the chart's resources are installed into.
+namespaceOverride: ""
+
+image:
+  # -- 2FAuth image repository.
+  repository: 2fauth/2fauth
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+  # -- Image tag. Defaults to the chart `appVersion` when empty.
+  tag: ""
+
+# -- Image pull secrets, e.g. `[{name: my-registry}]`.
+imagePullSecrets: []
+
+# -- Number of replicas. **Keep this at 1** unless you use an external database
+# *and* a ReadWriteMany volume: the container runs DB migrations on startup and
+# stores Passport OAuth keys on its data volume.
+replicaCount: 1
+
+# -- Deployment strategy. `Recreate` is required with a ReadWriteOnce volume so
+# the old pod releases it before the new one starts.
+strategy:
+  type: Recreate
+
+#
+# ─── Application configuration (rendered to env vars) ────────────────────────
+#
+config:
+  app:
+    # -- `APP_NAME`. Displayed name of the instance.
+    name: 2FAuth
+    # -- `APP_ENV`. `local` or `production`. Never set to `testing`.
+    env: local
+    # -- `APP_URL`. **Must** match the external URL of the instance or WebAuthn
+    # breaks. When `ingress.enabled=true` and this is empty, it is derived from
+    # the first ingress host.
+    url: ""
+    # -- `ASSET_URL`. Serve JS/CSS assets from a CDN. Leave empty to disable.
+    assetUrl: null
+    # -- `APP_SUBDIRECTORY`. Subdirectory 2FAuth is served from (no slashes),
+    # e.g. `2fa` when `url` is `https://example.org/2fa`.
+    subdirectory: ""
+    # -- `APP_TIMEZONE`. Timezone used to store dates in the database.
+    timezone: UTC
+    # -- `APP_DEBUG`. Show debug information on error screens. Keep false.
+    debug: false
+    # -- `SITE_OWNER`. Email address of the instance administrator.
+    siteOwner: mail@example.com
+    # -- `IS_DEMO_APP`. Resets all content hourly. Keep false.
+    isDemoApp: false
+
+  log:
+    # -- `LOG_CHANNEL`. Use `stderr` to get application logs via `kubectl logs`,
+    # or `daily` to write rotated files to the data volume.
+    channel: stderr
+    # -- `LOG_LEVEL`. debug|info|notice|warning|error|critical|alert|emergency.
+    level: notice
+
+  # -- `CACHE_DRIVER`. `file` (default) or `redis`.
+  cacheDriver: file
+  # -- `SESSION_DRIVER`. `file` (default) or `redis`.
+  sessionDriver: file
+
+  security:
+    # -- `CONTENT_SECURITY_POLICY`. Send CSP headers.
+    contentSecurityPolicy: true
+    # -- `BLOCK_OPTAUTH_IMAGELINK_FETCHING`. Blind-SSRF protection.
+    blockOtpauthImagelinkFetching: true
+    # -- `TRUSTED_PROXIES`. `*`, a comma-separated IP list, or null.
+    # Set this when running behind an ingress controller so that 2FAuth honours
+    # `X-Forwarded-*` headers (required for correct https detection).
+    # `*` is only safe when the pod is reachable *exclusively* through that
+    # proxy: a client talking to the pod directly (e.g. a LoadBalancer Service)
+    # could spoof `X-Forwarded-For` and sidestep the per-IP login throttle.
+    # Prefer your ingress controller's pod CIDR when you can.
+    trustedProxies: "*"
+    # -- `PROXY_FOR_OUTGOING_REQUESTS`. Egress proxy URL, or null.
+    proxyForOutgoingRequests: null
+    # -- `PHP_MEMORY_LIMIT_TEMP_OVERRIDE`. MB of RAM allowed while decoding QR
+    # codes. Keep `resources.limits.memory` comfortably above this.
+    phpMemoryLimitTempOverride: 512
+
+  api:
+    # -- `THROTTLE_API`. Max API calls per minute per IP. null disables.
+    throttle: 60
+    # -- `THROTTLE_API_DURING_IMPORT`. Max API calls per minute while importing.
+    throttleDuringImport: 1000
+
+  auth:
+    # -- `AUTHENTICATION_GUARD`. `web-guard` or `reverse-proxy-guard`.
+    # With `reverse-proxy-guard` your proxy is *fully* responsible for
+    # authentication — 2FAuth trusts the headers below unconditionally.
+    guard: web-guard
+    # -- `LOGIN_THROTTLE`. Failed logins per minute before lockout.
+    loginThrottle: 5
+    # -- `AUTHENTICATION_LOG_RETENTION`. Days.
+    logRetention: 365
+    # -- `OTP_LOG_RETENTION`. Days.
+    otpLogRetention: 365
+    # -- `AUTH_PROXY_HEADER_FOR_USER`. Only for `reverse-proxy-guard`.
+    proxyHeaderForUser: null
+    # -- `AUTH_PROXY_HEADER_FOR_EMAIL`. Only for `reverse-proxy-guard`.
+    proxyHeaderForEmail: null
+    # -- `PROXY_LOGOUT_URL`. Custom logout URL when using an auth proxy.
+    proxyLogoutUrl: null
+
+  webauthn:
+    # -- `WEBAUTHN_NAME`. Relying Party name. Do not set to null.
+    name: 2FAuth
+    # -- `WEBAUTHN_ID`. Relying Party ID; null lets the device infer it
+    # (recommended).
+    id: null
+    # -- `WEBAUTHN_USER_VERIFICATION`. required|preferred|discouraged.
+    userVerification: preferred
+
+  sso:
+    openid:
+      # -- Enable the generic OpenID Connect provider.
+      enabled: false
+      # -- `OPENID_AUTHORIZE_URL`.
+      authorizeUrl: ""
+      # -- `OPENID_TOKEN_URL`.
+      tokenUrl: ""
+      # -- `OPENID_USERINFO_URL`.
+      userinfoUrl: ""
+      # -- `OPENID_CLIENT_ID`.
+      clientId: ""
+      # -- `OPENID_CLIENT_SECRET`. Stored in the chart-managed Secret.
+      clientSecret: ""
+      # -- Read the client secret from an existing Secret instead.
+      existingSecret: ""
+      # -- Key holding the client secret in `existingSecret`.
+      existingSecretKey: openid-client-secret
+      # -- `OPENID_HTTP_VERIFY_SSL_PEER`. `true`, `false`, or a path to a CA
+      # bundle mounted into the pod.
+      verifySslPeer: true
+    github:
+      # -- Enable GitHub SSO.
+      enabled: false
+      # -- `GITHUB_CLIENT_ID`.
+      clientId: ""
+      # -- `GITHUB_CLIENT_SECRET`. Stored in the chart-managed Secret.
+      clientSecret: ""
+      # -- Read the client secret from an existing Secret instead.
+      existingSecret: ""
+      # -- Key holding the client secret in `existingSecret`.
+      existingSecretKey: github-client-secret
+
+  userPreferences:
+    # -- Default value for user preferences, e.g. `{THEME: light}` renders
+    # `USERPREF_DEFAULT__THEME=light`.
+    defaults: {}
+    # -- Preferences users may not change, e.g. `{THEME: true}` renders
+    # `USERPREF_LOCKED__THEME=true`.
+    locked: {}
+
+#
+# ─── APP_KEY ─────────────────────────────────────────────────────────────────
+#
+# Encryption key for the database content and sessions. Losing or changing it
+# makes every stored 2FA secret unreadable.
+appKey:
+  # -- Explicit key. Must be exactly 32 characters. When empty the chart
+  # generates one at install time and reuses it on every later upgrade.
+  value: ""
+  # -- Read `APP_KEY` from an existing Secret instead of the chart-managed one.
+  existingSecret: ""
+  # -- Key holding `APP_KEY` inside `existingSecret`.
+  existingSecretKey: app-key
+  # -- Previous keys (`APP_PREVIOUS_KEYS`, comma-separated) kept so data
+  # encrypted with an older key stays readable after a key rotation.
+  previousKeys: ""
+
+#
+# ─── Database ────────────────────────────────────────────────────────────────
+#
+database:
+  # -- `sqlite` (default, stored on the data volume), `mysql`, `pgsql` or
+  # `sqlsrv`.
+  type: sqlite
+  # -- Database host. Required for every type except sqlite.
+  host: ""
+  # -- Database port. Defaults to 3306 (mysql) / 5432 (pgsql) / 1433 (sqlsrv).
+  port: null
+  # -- Database name. For sqlite this is the in-container file path; the
+  # default path is symlinked to `/2fauth/database.sqlite` on the data volume.
+  name: ""
+  # -- Database user.
+  username: ""
+  # -- Database password. Stored in the chart-managed Secret.
+  password: ""
+  # -- Read the password from an existing Secret instead.
+  existingSecret: ""
+  # -- Key holding the password inside `existingSecret`.
+  existingSecretKey: db-password
+  # -- `MYSQL_ATTR_SSL_CA`. Absolute path, inside the pod, to the CA bundle used
+  # for TLS connections to MySQL. Mount it via `extraVolumes`/`extraVolumeMounts`.
+  mysqlSslCa: null
+
+#
+# ─── Redis (only used when cacheDriver/sessionDriver is `redis`) ──────────────
+#
+redis:
+  # -- `REDIS_HOST`.
+  host: ""
+  # -- `REDIS_PORT`.
+  port: 6379
+  # -- `REDIS_PASSWORD`. Stored in the chart-managed Secret.
+  password: ""
+  # -- Read the Redis password from an existing Secret instead.
+  existingSecret: ""
+  # -- Key holding the password inside `existingSecret`.
+  existingSecretKey: redis-password
+
+#
+# ─── Mail ────────────────────────────────────────────────────────────────────
+#
+mail:
+  # -- `MAIL_MAILER`. `log` writes mails to the log; use `smtp` for real mail.
+  mailer: log
+  # -- `MAIL_HOST`.
+  host: smtp.example.com
+  # -- `MAIL_PORT`. 587 for STARTTLS, 465 for SSL.
+  port: 587
+  # -- `MAIL_USERNAME`.
+  username: null
+  # -- `MAIL_PASSWORD`. Stored in the chart-managed Secret.
+  password: ""
+  # -- Read the mail password from an existing Secret instead.
+  existingSecret: ""
+  # -- Key holding the password inside `existingSecret`.
+  existingSecretKey: mail-password
+  # -- `MAIL_ENCRYPTION`. `tls`, `ssl` or null.
+  encryption: tls
+  # -- `MAIL_FROM_NAME`.
+  fromName: 2FAuth
+  # -- `MAIL_FROM_ADDRESS`.
+  fromAddress: null
+  # -- `MAIL_VERIFY_SSL_PEER`. Disabling this is a security risk.
+  verifySslPeer: true
+
+#
+# ─── Persistence ─────────────────────────────────────────────────────────────
+#
+# The image keeps everything stateful under `/2fauth`: the SQLite file, the
+# Laravel `storage/` directory (Passport OAuth keys, uploaded icons, logs) and
+# the `installed` marker.
+#
+# ⚠ Do not disable this. Without the `installed` marker the entrypoint runs
+# `php artisan migrate:fresh`, which DROPS EVERY TABLE — including on an
+# external database.
+persistence:
+  # -- Mount a persistent volume at `/2fauth`.
+  enabled: true
+  # -- Use an already existing PVC and ignore every other setting below.
+  existingClaim: ""
+  # -- StorageClass. `""` uses the cluster default, `"-"` disables dynamic
+  # provisioning.
+  storageClass: ""
+  # -- Access modes for the volume.
+  accessModes:
+    - ReadWriteOnce
+  # -- Requested size.
+  size: 1Gi
+  # -- Extra annotations for the PVC (e.g. to keep it on uninstall).
+  annotations: {}
+  # -- Extra labels for the PVC.
+  labels: {}
+  # -- Keep the PVC when the release is uninstalled.
+  retain: true
+
+#
+# ─── Service / Ingress ───────────────────────────────────────────────────────
+#
+service:
+  # -- Service type.
+  type: ClusterIP
+  # -- Service port.
+  port: 80
+  # -- NodePort to request when `type` is NodePort.
+  nodePort: null
+  # -- Static cluster IP.
+  clusterIP: null
+  # -- Load balancer IP when `type` is LoadBalancer.
+  loadBalancerIP: null
+  # -- Source ranges allowed to reach a LoadBalancer service.
+  loadBalancerSourceRanges: []
+  # -- Extra annotations for the Service.
+  annotations: {}
+  # -- Extra labels for the Service.
+  labels: {}
+  # -- `externalTrafficPolicy` for NodePort/LoadBalancer services.
+  externalTrafficPolicy: null
+
+ingress:
+  # -- Create an Ingress for 2FAuth.
+  enabled: false
+  # -- IngressClass name.
+  className: ""
+  # -- Extra annotations for the Ingress.
+  annotations: {}
+  #   nginx.ingress.kubernetes.io/proxy-body-size: 10m
+  # -- Hosts and paths served by the Ingress.
+  hosts:
+    - host: 2fauth.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  # -- TLS configuration.
+  tls: []
+  #  - secretName: 2fauth-tls
+  #    hosts:
+  #      - 2fauth.example.com
+  # -- Extra `spec` fields merged into the Ingress (e.g. `defaultBackend`).
+  extraSpec: {}
+
+#
+# ─── Probes ──────────────────────────────────────────────────────────────────
+#
+# 2FAuth exposes a health view at `/up`.
+probes:
+  # -- HTTP path used by all three probes.
+  path: /up
+  startup:
+    # -- Enable the startup probe. It covers the initial DB migration, which can
+    # take a while on first install.
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 60
+    successThreshold: 1
+  liveness:
+    # -- Enable the liveness probe.
+    enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 5
+    successThreshold: 1
+  readiness:
+    # -- Enable the readiness probe.
+    enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+  # -- Replace the startup probe entirely with a custom definition.
+  customStartupProbe: {}
+  # -- Replace the liveness probe entirely with a custom definition.
+  customLivenessProbe: {}
+  # -- Replace the readiness probe entirely with a custom definition.
+  customReadinessProbe: {}
+
+#
+# ─── Pod settings ────────────────────────────────────────────────────────────
+#
+# -- Container resource requests/limits. Keep memory above
+# `config.security.phpMemoryLimitTempOverride`.
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    memory: 768Mi
+
+# -- Pod-level security context. The image runs as uid/gid 1000 and the data
+# volume must be writable by it.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container-level security context. `readOnlyRootFilesystem` cannot be
+# enabled: the entrypoint rewrites symlinks and caches the Laravel config under
+# `/srv` at every start.
+securityContext:
+  allowPrivilegeEscalation: false
+  privileged: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+serviceAccount:
+  # -- Create a ServiceAccount for the pod.
+  create: true
+  # -- Name of the ServiceAccount. Generated when empty.
+  name: ""
+  # -- Annotations for the ServiceAccount.
+  annotations: {}
+  # -- Mount the API credentials in the pod. 2FAuth never calls the API.
+  automountServiceAccountToken: false
+
+# -- Extra annotations for the pod.
+podAnnotations: {}
+# -- Extra labels for the pod.
+podLabels: {}
+# -- Extra labels applied to every resource in the chart.
+commonLabels: {}
+# -- Extra annotations applied to every resource in the chart.
+commonAnnotations: {}
+
+# -- Node selector for pod assignment.
+nodeSelector: {}
+# -- Tolerations for pod assignment.
+tolerations: []
+# -- Affinity rules for pod assignment.
+affinity: {}
+# -- Topology spread constraints.
+topologySpreadConstraints: []
+# -- Pod priority class.
+priorityClassName: ""
+# -- Grace period before the pod is killed.
+terminationGracePeriodSeconds: 30
+# -- DNS policy.
+dnsPolicy: ""
+# -- DNS configuration.
+dnsConfig: {}
+# -- Host aliases injected into `/etc/hosts`.
+hostAliases: []
+
+# -- Extra environment variables, as a list of `{name, value}` or
+# `{name, valueFrom}` entries. These win over everything the chart renders.
+extraEnv: []
+# -- Extra `envFrom` sources (ConfigMaps / Secrets) for the container.
+extraEnvFrom: []
+# -- Extra volumes for the pod.
+extraVolumes: []
+# -- Extra volume mounts for the container.
+extraVolumeMounts: []
+# -- Extra init containers.
+initContainers: []
+# -- Extra sidecar containers.
+sidecars: []
+# -- Override the container command.
+command: []
+# -- Override the container arguments.
+args: []
+
+#
+# ─── Laravel task scheduler ──────────────────────────────────────────────────
+#
+# The upstream image runs only nginx + php-fpm, so Laravel's scheduler never
+# fires. In 2FAuth 8.x the schedule contains a single task,
+# `cache:prune-stale-tags`, which does nothing unless the cache store supports
+# tags — so you only need this with `config.cacheDriver: redis`.
+#
+# Log retention (`config.auth.logRetention` / `otpLogRetention`) does NOT
+# depend on this: 2FAuth purges those logs from the request path.
+scheduler:
+  # -- Run `php artisan schedule:run` on a CronJob.
+  enabled: false
+  # -- Cron schedule. Laravel expects to be invoked every minute; hourly is
+  # enough for the tasks 2FAuth actually registers.
+  schedule: "0 * * * *"
+  # -- Command run in the container. Overrides the image entrypoint, which
+  # would otherwise migrate the database and start supervisord.
+  command:
+    - php
+    - artisan
+    - schedule:run
+  # -- Mount the data volume. Needed only if the command touches the SQLite
+  # database or `storage/`. With a ReadWriteOnce volume this forces the job
+  # onto the same node as the app pod.
+  mountData: false
+  # -- Resources for the job pod.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  # -- Retries before the job is marked failed.
+  backoffLimit: 1
+  # -- Seconds a missed schedule may still start late.
+  startingDeadlineSeconds: 300
+  # -- Successful jobs kept in history.
+  successfulJobsHistoryLimit: 3
+  # -- Failed jobs kept in history.
+  failedJobsHistoryLimit: 3
+
+podDisruptionBudget:
+  # -- Create a PodDisruptionBudget. Only meaningful with `replicaCount > 1`.
+  enabled: false
+  # -- Minimum available pods.
+  minAvailable: 1
+  # -- Maximum unavailable pods. Mutually exclusive with `minAvailable`.
+  maxUnavailable: null
+
+networkPolicy:
+  # -- Create a NetworkPolicy for the pod.
+  enabled: false
+  # -- Ingress sources allowed to reach the pod. Empty allows the whole cluster.
+  allowedIngress: []
+  #  - namespaceSelector:
+  #      matchLabels:
+  #        kubernetes.io/metadata.name: ingress-nginx
+  # -- Allow all egress traffic. Disable it and use `extraEgress` to restrict
+  # the pod to its database and SMTP server.
+  allowAllEgress: true
+  # -- Extra egress rules, appended to the generated ones.
+  extraEgress: []
+
+tests:
+  # -- Image used by `helm test`.
+  image:
+    repository: curlimages/curl
+    tag: "8.11.1"
+    pullPolicy: IfNotPresent
+  # -- Attempts before the test is considered failed.
+  retries: 10
+  # -- Seconds between attempts.
+  retryDelaySeconds: 5

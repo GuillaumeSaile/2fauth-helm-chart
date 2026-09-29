@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "2fauth.fullname" . }}-test-connection
+  namespace: {{ include "2fauth.namespace" . }}
+  labels:
+    {{- include "2fauth.testLabels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    {{- with .Values.commonAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  restartPolicy: Never
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: test
+      image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
+      imagePullPolicy: {{ .Values.tests.image.pullPolicy }}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -eu
+          url="http://{{ include "2fauth.fullname" . }}.{{ include "2fauth.namespace" . }}.svc:{{ .Values.service.port }}{{ .Values.probes.path }}"
+          echo "GET ${url}"
+          # Retry: the hook can fire before kube-proxy has programmed the
+          # Service, which shows up as an immediate connection refused.
+          attempt=1
+          while [ "${attempt}" -le {{ .Values.tests.retries }} ]; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "${url}" || echo "000")
+            echo "attempt ${attempt}: HTTP ${code}"
+            if [ "${code}" = "200" ]; then
+              echo "OK"
+              exit 0
+            fi
+            attempt=$((attempt + 1))
+            sleep {{ .Values.tests.retryDelaySeconds }}
+          done
+          echo "FAILED: ${url} never returned 200"
+          exit 1

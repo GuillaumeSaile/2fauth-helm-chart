@@ -1,0 +1,35 @@
+apiVersion: v2
+name: 2fauth
+description: |
+  A web app to manage your Two-Factor Authentication (2FA) accounts and generate
+  their security codes. Self-hosted alternative to Google Authenticator & friends.
+type: application
+
+# Chart version. Bump on every change to the chart itself.
+version: 1.0.0
+
+# Version of 2FAuth shipped by default (used as the default image tag).
+appVersion: "8.0.2"
+
+home: https://docs.2fauth.app
+icon: https://raw.githubusercontent.com/Bubka/2FAuth/master/public/logo.svg
+sources:
+  - https://github.com/Bubka/2FAuth
+  - https://hub.docker.com/r/2fauth/2fauth
+
+keywords:
+  - 2fa
+  - totp
+  - hotp
+  - otp
+  - authenticator
+  - security
+  - self-hosted
+
+maintainers:
+  - name: GuillaumeSaile
+    url: https://github.com/GuillaumeSaile
+
+annotations:
+  category: Security
+  artifacthub.io/license: Apache-2.0

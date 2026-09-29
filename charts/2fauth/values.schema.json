@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "2fauth chart values",
+  "type": "object",
+  "properties": {
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "namespaceOverride": { "type": "string" },
+    "replicaCount": { "type": "integer", "minimum": 0 },
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      },
+      "required": ["repository"]
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "app": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "env": { "type": "string", "enum": ["local", "production"] },
+            "url": { "type": "string" },
+            "assetUrl": { "type": ["string", "null"] },
+            "subdirectory": { "type": "string" },
+            "timezone": { "type": "string" },
+            "debug": { "type": "boolean" },
+            "siteOwner": { "type": "string" },
+            "isDemoApp": { "type": "boolean" }
+          }
+        },
+        "log": {
+          "type": "object",
+          "properties": {
+            "channel": { "type": "string" },
+            "level": {
+              "type": "string",
+              "enum": ["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"]
+            }
+          }
+        },
+        "cacheDriver": { "type": "string" },
+        "sessionDriver": { "type": "string" },
+        "security": {
+          "type": "object",
+          "properties": {
+            "contentSecurityPolicy": { "type": "boolean" },
+            "blockOtpauthImagelinkFetching": { "type": "boolean" },
+            "trustedProxies": { "type": ["string", "null"] },
+            "proxyForOutgoingRequests": { "type": ["string", "null"] },
+            "phpMemoryLimitTempOverride": { "type": ["integer", "null"] }
+          }
+        },
+        "api": {
+          "type": "object",
+          "properties": {
+            "throttle": { "type": ["integer", "null"] },
+            "throttleDuringImport": { "type": ["integer", "null"] }
+          }
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "guard": { "type": "string", "enum": ["web-guard", "reverse-proxy-guard"] },
+            "loginThrottle": { "type": "integer", "minimum": 0 },
+            "logRetention": { "type": "integer", "minimum": 0 },
+            "otpLogRetention": { "type": "integer", "minimum": 0 },
+            "proxyHeaderForUser": { "type": ["string", "null"] },
+            "proxyHeaderForEmail": { "type": ["string", "null"] },
+            "proxyLogoutUrl": { "type": ["string", "null"] }
+          }
+        },
+        "webauthn": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "id": { "type": ["string", "null"] },
+            "userVerification": { "type": "string", "enum": ["required", "preferred", "discouraged"] }
+          }
+        },
+        "userPreferences": {
+          "type": "object",
+          "properties": {
+            "defaults": { "type": "object" },
+            "locked": { "type": "object" }
+          }
+        }
+      }
+    },
+    "appKey": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" },
+        "existingSecret": { "type": "string" },
+        "existingSecretKey": { "type": "string" },
+        "previousKeys": { "type": "string" }
+      }
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["sqlite", "mysql", "pgsql", "sqlsrv"] },
+        "host": { "type": "string" },
+        "port": { "type": ["integer", "null"] },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "existingSecret": { "type": "string" },
+        "existingSecretKey": { "type": "string" },
+        "mysqlSslCa": { "type": ["string", "null"] }
+      },
+      "required": ["type"]
+    },
+    "persistence": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "existingClaim": { "type": "string" },
+        "storageClass": { "type": "string" },
+        "accessModes": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"] },
+          "minItems": 1
+        },
+        "size": { "type": "string" },
+        "retain": { "type": "boolean" }
+      },
+      "required": ["enabled"]
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "nodePort": { "type": ["integer", "null"] }
+      },
+      "required": ["type", "port"]
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": { "type": "string" },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": { "type": "string" },
+                    "pathType": { "type": "string", "enum": ["Exact", "Prefix", "ImplementationSpecific"] }
+                  },
+                  "required": ["path"]
+                }
+              }
+            },
+            "required": ["host"]
+          }
+        },
+        "tls": { "type": "array" }
+      },
+      "required": ["enabled"]
+    },
+    "extraEnv": { "type": "array" },
+    "extraEnvFrom": { "type": "array" },
+    "extraVolumes": { "type": "array" },
+    "extraVolumeMounts": { "type": "array" },
+    "initContainers": { "type": "array" },
+    "sidecars": { "type": "array" }
+  },
+  "required": ["image", "config", "database", "persistence", "service"]
+}

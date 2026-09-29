@@ -1,0 +1,16 @@
+{{- include "2fauth.validateValues" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "2fauth.configMapName" . }}
+  namespace: {{ include "2fauth.namespace" . }}
+  labels:
+    {{- include "2fauth.labels" . | nindent 4 }}
+  {{- with (include "2fauth.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+data:
+  {{- range $key, $value := (include "2fauth.configEnv" . | fromYaml) }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}

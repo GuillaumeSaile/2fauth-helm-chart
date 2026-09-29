@@ -1,0 +1,7 @@
+# Upstream 2FAuth checkout used as reference while writing the chart
+/2FAuth/
+# Local Claude Code settings
+/.claude/
+# Packaged charts
+*.tgz
+.DS_Store
