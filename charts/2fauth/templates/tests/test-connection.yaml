@@ -7,7 +7,9 @@ metadata:
     {{- include "2fauth.testLabels" . | nindent 4 }}
   annotations:
     helm.sh/hook: test
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    # No `hook-succeeded`: Helm 3 deletes the pod before `helm test --logs`
+    # can read it and then fails. The next `helm test` replaces it instead.
+    helm.sh/hook-delete-policy: before-hook-creation
     {{- with .Values.commonAnnotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
