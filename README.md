@@ -8,7 +8,7 @@ Upstream supports only bare-metal and Docker installs.
 
 ```sh
 helm install my-2fauth oci://ghcr.io/guillaumesaile/charts/2fauth \
-  --version 1.0.0 \
+  --version 2.0.0 \
   --namespace 2fauth --create-namespace \
   --set config.app.url=https://2fa.example.com
 ```
