@@ -1,7 +1,7 @@
 {{- if .Values.scheduler.enabled }}
 {{- /*
 The upstream image runs only nginx and php-fpm under supervisord, so Laravel's
-task scheduler never fires. As of 2FAuth 8.x the schedule holds a single entry,
+task scheduler never fires. 2FAuth's schedule holds a single entry,
 `cache:prune-stale-tags`, which is a no-op unless the cache store supports tags
 (i.e. Redis) — hence this CronJob is opt-in.
 

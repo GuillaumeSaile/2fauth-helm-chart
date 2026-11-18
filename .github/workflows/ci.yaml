@@ -32,6 +32,15 @@ jobs:
       - name: Lint, render and check guardrails
         run: .github/scripts/lint.sh charts/2fauth
 
+  versions:
+    name: Docs quote the current versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Compare doc references with Chart.yaml
+        run: .github/scripts/check-versions.sh charts/2fauth
+
   version-check:
     name: Chart version not already released
     if: github.event_name == 'pull_request'

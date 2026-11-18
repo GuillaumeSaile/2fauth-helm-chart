@@ -16,7 +16,7 @@ The chart is published as an OCI artifact on GitHub Container Registry:
 
 ```sh
 helm install my-2fauth oci://ghcr.io/guillaumesaile/charts/2fauth \
-  --version 1.0.0 \
+  --version 2.0.1 \
   --namespace 2fauth --create-namespace \
   --set config.app.url=https://2fa.example.com \
   --set ingress.enabled=true \
@@ -278,8 +278,8 @@ config:
 ### The Laravel task scheduler
 
 The upstream image runs only nginx and PHP-FPM under supervisord, so Laravel's
-scheduler never fires — on Docker either. In 2FAuth 8.x the schedule contains a
-single task, `cache:prune-stale-tags`, which does nothing unless the cache store
+scheduler never fires — on Docker either. 2FAuth's schedule contains a single
+task, `cache:prune-stale-tags`, which does nothing unless the cache store
 supports tags. So you only need this with Redis:
 
 ```yaml

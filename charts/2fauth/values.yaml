@@ -454,7 +454,7 @@ args: []
 # ─── Laravel task scheduler ──────────────────────────────────────────────────
 #
 # The upstream image runs only nginx + php-fpm, so Laravel's scheduler never
-# fires. In 2FAuth 8.x the schedule contains a single task,
+# fires. 2FAuth's schedule contains a single task,
 # `cache:prune-stale-tags`, which does nothing unless the cache store supports
 # tags — so you only need this with `config.cacheDriver: redis`.
 #

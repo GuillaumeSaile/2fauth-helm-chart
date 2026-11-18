@@ -8,7 +8,10 @@
 #   9.0.x -> 9.1.0   chart 2.0.x -> 2.1.0
 #   9.x.x -> 10.0.0  chart 2.x.x -> 3.0.0
 #
-# Edits Chart.yaml and README.md in place. In GitHub Actions it also writes
+# Stops with an error if upstream changed its Laravel task schedule, which the
+# chart's scheduler docs depend on.
+#
+# Edits Chart.yaml and every tracked Markdown file in place. In GitHub Actions it also writes
 # `updated`, `app_version` and `chart_version` to $GITHUB_OUTPUT.
 #
 # Usage: .github/scripts/upstream-update.sh [chart-dir]
@@ -19,7 +22,9 @@ CHART="${1:-charts/2fauth}"
 UPSTREAM_REPO="${UPSTREAM_REPO:-Bubka/2FAuth}"
 IMAGE_REPO="${IMAGE_REPO:-2fauth/2fauth}"
 MIN_AGE_HOURS="${MIN_AGE_HOURS:-48}"
-README="${README:-README.md}"
+# What the chart's docs and its opt-in scheduler CronJob assume 2FAuth
+# schedules. If upstream changes it, a human has to review the chart first.
+EXPECTED_SCHEDULE="\$schedule->command('cache:prune-stale-tags')->hourly();"
 
 output() { [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "$1=$2" >> "${GITHUB_OUTPUT}"; return 0; }
 
@@ -70,6 +75,17 @@ if [[ -z "${target}" ]]; then
   exit 0
 fi
 
+schedule=$(
+  gh api "repos/${UPSTREAM_REPO}/contents/app/Console/Kernel.php?ref=v${target}" --jq .content |
+    base64 -d | grep -F '$schedule->' | sed -E 's/^[[:space:]]+//' || true
+)
+if [[ "${schedule}" != "${EXPECTED_SCHEDULE}" ]]; then
+  echo "::error::2FAuth ${target} changed its task schedule (app/Console/Kernel.php). The chart documents the scheduler as optional and only useful with Redis; review that (README, values.yaml, templates/cronjob-scheduler.yaml), update EXPECTED_SCHEDULE in $0, then rerun."
+  echo "Expected: ${EXPECTED_SCHEDULE}"
+  echo "Found:"; echo "${schedule:-<nothing>}"
+  exit 1
+fi
+
 IFS=. read -r a_maj a_min _ <<<"${current_app}"
 IFS=. read -r t_maj t_min _ <<<"${target}"
 IFS=. read -r c_maj c_min c_pat <<<"${current_chart}"
@@ -89,13 +105,15 @@ edit "${CHART}/Chart.yaml" \
   -e "s/^version: .*/version: ${new_chart}/" \
   -e "s/^appVersion: .*/appVersion: \"${target}\"/"
 
-# Install snippet and the "deploys 2FAuth" line.
-edit "${README}" \
-  -e "s/(--version )[0-9]+\.[0-9]+\.[0-9]+/\1${new_chart}/" \
-  -e "s#(The current chart, \`)[^\`]+(\`, deploys 2FAuth \[\`)[^\`]+(\`\]\(https://github.com/${UPSTREAM_REPO}/releases/tag/v)[^)]+\)#\1${new_chart}\2${target}\3${target})#"
+# Install snippets and the "deploys 2FAuth" line, in every tracked doc.
+git ls-files -z -- '*.md' | while IFS= read -r -d '' doc; do
+  edit "${doc}" \
+    -e "s/(--version )[0-9]+\.[0-9]+\.[0-9]+/\1${new_chart}/g" \
+    -e "s#(The current chart, \`)[^\`]+(\`, deploys 2FAuth \[\`)[^\`]+(\`\]\(https://github.com/${UPSTREAM_REPO}/releases/tag/v)[^)]+\)#\1${new_chart}\2${target}\3${target})#"
+done
 
-grep -q -- "--version ${new_chart}" "${README}" || { echo "::error::could not update the install snippet in ${README}"; exit 1; }
-grep -q "deploys 2FAuth \[\`${target}\`\]" "${README}" || { echo "::error::could not update the 2FAuth version line in ${README}"; exit 1; }
+# Same check CI runs: anything we failed to rewrite stops the update here.
+"$(dirname "$0")/check-versions.sh" "${CHART}"
 
 output updated true
 output app_version "${target}"

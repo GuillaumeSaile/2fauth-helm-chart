@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add charts/2fauth/Chart.yaml README.md
+          git add -u -- charts/2fauth/Chart.yaml '*.md'
           git commit -m "feat(version): Update 2FAuth to ${APP_VERSION} (chart ${CHART_VERSION})" \
             -m "Upstream release: https://github.com/Bubka/2FAuth/releases/tag/v${APP_VERSION}"
           git push origin HEAD:main
