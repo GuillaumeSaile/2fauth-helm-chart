@@ -96,6 +96,8 @@ jobs:
           cat > notes.md <<EOF
           Chart \`${NAME}\` **${VERSION}** — deploys 2FAuth **${APP_VERSION}**.
 
+          What's new in 2FAuth ${APP_VERSION}: [upstream changelog](https://github.com/Bubka/2FAuth/releases/tag/v${APP_VERSION}).
+
           \`\`\`sh
           helm install my-2fauth oci://${REGISTRY}/${NAME} --version ${VERSION} \\
             --namespace 2fauth --create-namespace \\

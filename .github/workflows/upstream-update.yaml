@@ -1,0 +1,58 @@
+name: Upstream update
+
+# Once a day, moves the chart to the newest 2FAuth release that has been out
+# for at least 48 hours (supply-chain quarantine), bumps the chart version to
+# match the size of the upstream bump, commits to main and starts a release.
+# See .github/scripts/upstream-update.sh for the rules.
+
+on:
+  schedule:
+    - cron: "23 5 * * *" # daily, 05:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the bump to main
+      actions: write # start release.yaml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - name: Look for a new 2FAuth release
+        id: update
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: .github/scripts/upstream-update.sh charts/2fauth
+
+      - name: Commit and push
+        if: steps.update.outputs.updated == 'true'
+        env:
+          APP_VERSION: ${{ steps.update.outputs.app_version }}
+          CHART_VERSION: ${{ steps.update.outputs.chart_version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add charts/2fauth/Chart.yaml README.md
+          git commit -m "feat(version): Update 2FAuth to ${APP_VERSION} (chart ${CHART_VERSION})" \
+            -m "Upstream release: https://github.com/Bubka/2FAuth/releases/tag/v${APP_VERSION}"
+          git push origin HEAD:main
+
+      # Pushes made with GITHUB_TOKEN don't trigger other workflows, so
+      # release.yaml's push trigger won't fire. workflow_dispatch is exempt.
+      # release.yaml runs CI first and stops if it fails.
+      - name: Start the release
+        if: steps.update.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run release.yaml --ref main --repo "${GITHUB_REPOSITORY}"
