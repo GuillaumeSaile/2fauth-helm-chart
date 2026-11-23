@@ -8,12 +8,12 @@ Upstream supports only bare-metal and Docker installs.
 
 ```sh
 helm install my-2fauth oci://ghcr.io/guillaumesaile/charts/2fauth \
-  --version 2.0.1 \
+  --version 2.0.2 \
   --namespace 2fauth --create-namespace \
   --set config.app.url=https://2fa.example.com
 ```
 
-The current chart, `2.0.1`, deploys 2FAuth [`9.0.1`](https://github.com/Bubka/2FAuth/releases/tag/v9.0.1).
+The current chart, `2.0.2`, deploys 2FAuth [`9.0.2`](https://github.com/Bubka/2FAuth/releases/tag/v9.0.2).
 
 The documentation is in [`charts/2fauth/README.md`](charts/2fauth/README.md).
 Read its "Things that will bite you" section before you deploy. It explains
