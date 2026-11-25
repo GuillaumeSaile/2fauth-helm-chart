@@ -16,7 +16,7 @@ The chart is published as an OCI artifact on GitHub Container Registry:
 
 ```sh
 helm install my-2fauth oci://ghcr.io/guillaumesaile/charts/2fauth \
-  --version 2.0.2 \
+  --version 2.0.3 \
   --namespace 2fauth --create-namespace \
   --set config.app.url=https://2fa.example.com \
   --set ingress.enabled=true \
